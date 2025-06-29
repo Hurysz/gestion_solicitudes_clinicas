@@ -1,19 +1,85 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../services/supabase_service.dart';
 import 'login_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class RequestListScreen extends StatefulWidget {
   final String ruc;
   final String nombre;
 
-  const RequestListScreen({super.key, required this.ruc, required this.nombre});
+  const RequestListScreen({
+    super.key,
+    required this.ruc,
+    required this.nombre,
+  });
 
   @override
   State<RequestListScreen> createState() => _RequestListScreenState();
 }
 
 class _RequestListScreenState extends State<RequestListScreen> {
-  String? estadoSeleccionado;
-  String? fechaSeleccionada;
+  String? estadoSeleccionado = 'Todos';
+  String? prioridadSeleccionada = 'Todos';
+  String? fechaSeleccionada = 'Todos';
+
+  List<dynamic> solicitudes = [];
+  bool cargando = true;
+
+  @override
+  void initState() {
+    super.initState();
+    cargarSolicitudes();
+  }
+
+  Future<void> cargarSolicitudes() async {
+    setState(() => cargando = true);
+
+    final query = SupabaseService.client
+        .from('solicitudes')
+        .select()
+        .eq('ruc_clinica', widget.ruc);
+
+    if (estadoSeleccionado != null && estadoSeleccionado != 'Todos') {
+      query.eq('estado', estadoSeleccionado);
+    }
+    if (prioridadSeleccionada != null && prioridadSeleccionada != 'Todos') {
+      query.eq('prioridad', prioridadSeleccionada);
+    }
+    if (fechaSeleccionada != null && fechaSeleccionada != 'Todos') {
+      final now = DateTime.now();
+      DateTime desde;
+      if (fechaSeleccionada == 'hoy') {
+        desde = DateTime(now.year, now.month, now.day);
+      } else if (fechaSeleccionada == 'últimos 7 días') {
+        desde = now.subtract(const Duration(days: 7));
+      } else {
+        desde = DateTime(now.year, now.month, 1);
+      }
+      query.gte('fecha_creacion', desde.toIso8601String());
+    }
+
+    final response = await query.order('fecha_creacion', ascending: false);
+
+    setState(() {
+      solicitudes = response;
+      cargando = false;
+    });
+  }
+
+  void reiniciarFiltros() {
+    setState(() {
+      estadoSeleccionado = 'Todos';
+      prioridadSeleccionada = 'Todos';
+      fechaSeleccionada = 'Todos';
+    });
+    cargarSolicitudes();
+  }
+
+  String formatFecha(String fechaISO) {
+    final date = DateTime.parse(fechaISO);
+    return DateFormat('dd/MM/yyyy HH:mm').format(date);
+  }
 
   void logout() {
     Navigator.pushReplacement(
@@ -21,6 +87,85 @@ class _RequestListScreenState extends State<RequestListScreen> {
       MaterialPageRoute(builder: (_) => const LoginScreen()),
     );
   }
+
+  void mostrarDetalle(Map<String, dynamic> solicitud) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF1E2A38),
+        title: Text(
+          'Solicitud #${solicitud['id']}',
+          style: const TextStyle(color: Colors.orange),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Fecha: ${formatFecha(solicitud['fecha_creacion'])}',
+                style: const TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Descripción:',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                solicitud['descripcion'] ?? '',
+                style: const TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Estado: ${solicitud['estado']}',
+                style: const TextStyle(color: Colors.white70),
+              ),
+              Text(
+                'Prioridad: ${solicitud['prioridad']}',
+                style: const TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 12),
+              if (solicitud['archivo_url'] != null && solicitud['archivo_url'].toString().isNotEmpty)
+                TextButton.icon(
+                  onPressed: () async {
+                    final Uri url = Uri.parse(solicitud['archivo_url']);
+                    if (await canLaunchUrl(url)) {
+                      await launchUrl(url, mode: LaunchMode.externalApplication);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('No se pudo abrir el archivo'),
+                        ),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.download, color: Colors.orange),
+                  label: const Text(
+                    'Descargar archivo',
+                    style: TextStyle(
+                      color: Colors.orange,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cerrar',
+              style: TextStyle(color: Colors.orange),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +176,6 @@ class _RequestListScreenState extends State<RequestListScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const CircleAvatar(
                 backgroundColor: Colors.orange,
@@ -43,14 +187,18 @@ class _RequestListScreenState extends State<RequestListScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Portal Clínica',
-                        style: TextStyle(
-                            color: Colors.orange,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold)),
-                    Text(widget.nombre,
-                        style: const TextStyle(
-                            color: Colors.white70, fontSize: 14)),
+                    const Text(
+                      'Portal Clínica',
+                      style: TextStyle(
+                          color: Colors.orange,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      widget.nombre,
+                      style: const TextStyle(
+                          color: Colors.white70, fontSize: 14),
+                    ),
                   ],
                 ),
               ),
@@ -61,11 +209,14 @@ class _RequestListScreenState extends State<RequestListScreen> {
             ],
           ),
           const SizedBox(height: 30),
-          const Text('MIS SOLICITUDES',
-              style: TextStyle(
-                  color: Colors.orange,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold)),
+          const Text(
+            'MIS SOLICITUDES',
+            style: TextStyle(
+              color: Colors.orange,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 20),
           Row(
             children: [
@@ -82,12 +233,39 @@ class _RequestListScreenState extends State<RequestListScreen> {
                     border: OutlineInputBorder(),
                   ),
                   items: const [
+                    DropdownMenuItem(value: 'Todos', child: Text('Todos')),
                     DropdownMenuItem(value: 'pendiente', child: Text('Pendiente')),
                     DropdownMenuItem(value: 'en proceso', child: Text('En proceso')),
                     DropdownMenuItem(value: 'resuelto', child: Text('Resuelto')),
                   ],
                   onChanged: (value) {
                     setState(() => estadoSeleccionado = value);
+                    cargarSolicitudes();
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: prioridadSeleccionada,
+                  dropdownColor: Colors.black87,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: 'Prioridad',
+                    labelStyle: TextStyle(color: Colors.white),
+                    filled: true,
+                    fillColor: Colors.white10,
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'Todos', child: Text('Todos')),
+                    DropdownMenuItem(value: 'Alta', child: Text('Alta')),
+                    DropdownMenuItem(value: 'Media', child: Text('Media')),
+                    DropdownMenuItem(value: 'Baja', child: Text('Baja')),
+                  ],
+                  onChanged: (value) {
+                    setState(() => prioridadSeleccionada = value);
+                    cargarSolicitudes();
                   },
                 ),
               ),
@@ -105,47 +283,97 @@ class _RequestListScreenState extends State<RequestListScreen> {
                     border: OutlineInputBorder(),
                   ),
                   items: const [
+                    DropdownMenuItem(value: 'Todos', child: Text('Todos')),
                     DropdownMenuItem(value: 'hoy', child: Text('Hoy')),
                     DropdownMenuItem(value: 'últimos 7 días', child: Text('Últimos 7 días')),
                     DropdownMenuItem(value: 'este mes', child: Text('Este mes')),
                   ],
                   onChanged: (value) {
                     setState(() => fechaSeleccionada = value);
+                    cargarSolicitudes();
                   },
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          const Expanded(
-            child: Column(
-              children: [
-                Card(
-                  color: Colors.white10,
-                  margin: EdgeInsets.only(bottom: 12.0),
-                  child: ListTile(
-                    title: Text('Error en sistema de ventas',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold)),
-                    subtitle: Text('Prioridad: Alta\nEstado: pendiente',
-                        style: TextStyle(color: Colors.white70)),
-                  ),
-                ),
-                Card(
-                  color: Colors.white10,
-                  margin: EdgeInsets.only(bottom: 12.0),
-                  child: ListTile(
-                    title: Text('No imprime reporte médico',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold)),
-                    subtitle: Text('Prioridad: Media\nEstado: en proceso',
-                        style: TextStyle(color: Colors.white70)),
-                  ),
-                ),
-              ],
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: reiniciarFiltros,
+              icon: const Icon(Icons.refresh, color: Colors.orange),
+              label: const Text(
+                'Reiniciar filtros',
+                style: TextStyle(color: Colors.orange),
+              ),
             ),
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: cargando
+                ? const Center(child: CircularProgressIndicator(color: Colors.orange))
+                : solicitudes.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'No hay solicitudes aún',
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: solicitudes.length,
+                        itemBuilder: (context, index) {
+                          final solicitud = solicitudes[index];
+                          return Card(
+                            color: Colors.white10,
+                            margin: const EdgeInsets.only(bottom: 12.0),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.all(16),
+                              title: Text(
+                                '#${solicitud['id']}',
+                                style: const TextStyle(
+                                    color: Colors.orange,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16),
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Fecha: ${formatFecha(solicitud['fecha_creacion'])}',
+                                    style: const TextStyle(
+                                        color: Colors.white70, fontSize: 12),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    solicitud['descripcion'] ?? '',
+                                    style: const TextStyle(
+                                        color: Colors.white, fontSize: 14),
+                                  ),
+                                ],
+                              ),
+                              trailing: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    solicitud['estado'],
+                                    style: const TextStyle(
+                                        color: Colors.orange,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Prioridad: ${solicitud['prioridad']}',
+                                    style: const TextStyle(
+                                        color: Colors.white70, fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                              onTap: () => mostrarDetalle(solicitud),
+                            ),
+                          );
+                        },
+                      ),
           ),
         ],
       ),

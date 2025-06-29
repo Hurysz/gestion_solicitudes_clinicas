@@ -1,4 +1,3 @@
-// main_tab_screen.dart
 import 'package:flutter/material.dart';
 import 'create_request_screen.dart';
 import 'request_list_screen.dart';
@@ -8,7 +7,11 @@ class MainTabScreen extends StatefulWidget {
   final String ruc;
   final String nombre;
 
-  const MainTabScreen({super.key, required this.ruc, required this.nombre});
+  const MainTabScreen({
+    super.key,
+    required this.ruc,
+    required this.nombre,
+  });
 
   @override
   State<MainTabScreen> createState() => _MainTabScreenState();
@@ -23,10 +26,15 @@ class _MainTabScreenState extends State<MainTabScreen> {
   void initState() {
     super.initState();
     _screens = [
-      CreateRequestScreen(ruc: widget.ruc, nombre: widget.nombre),
-      RequestListScreen(ruc: widget.ruc, nombre: widget.nombre),
-      HistorialScreen(nombre: widget.nombre),
-
+      CreateRequestScreen(
+        ruc: widget.ruc,
+        nombre: widget.nombre,
+      ),
+      RequestListScreen(
+        ruc: widget.ruc,
+        nombre: widget.nombre,
+      ),
+      HistorialScreen(nombre: widget.nombre, ruc: widget.ruc)
     ];
   }
 
