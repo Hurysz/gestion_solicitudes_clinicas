@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/supabase_service.dart';
 import 'login_screen.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class RequestListScreen extends StatefulWidget {
@@ -19,9 +20,9 @@ class RequestListScreen extends StatefulWidget {
 }
 
 class _RequestListScreenState extends State<RequestListScreen> {
-  String? estadoSeleccionado = 'Todos';
-  String? prioridadSeleccionada = 'Todos';
-  String? fechaSeleccionada = 'Todos';
+  String estadoSeleccionado = 'Todos';
+  String prioridadSeleccionada = 'Todos';
+  String fechaSeleccionada = 'Todos';
 
   List<dynamic> solicitudes = [];
   bool cargando = true;
@@ -35,18 +36,18 @@ class _RequestListScreenState extends State<RequestListScreen> {
   Future<void> cargarSolicitudes() async {
     setState(() => cargando = true);
 
-    final query = SupabaseService.client
+    var query = SupabaseService.client
         .from('solicitudes')
         .select()
         .eq('ruc_clinica', widget.ruc);
 
-    if (estadoSeleccionado != null && estadoSeleccionado != 'Todos') {
-      query.eq('estado', estadoSeleccionado);
+    if (estadoSeleccionado != 'Todos') {
+      query = query.eq('estado', estadoSeleccionado);
     }
-    if (prioridadSeleccionada != null && prioridadSeleccionada != 'Todos') {
-      query.eq('prioridad', prioridadSeleccionada);
+    if (prioridadSeleccionada != 'Todos') {
+      query = query.eq('prioridad', prioridadSeleccionada);
     }
-    if (fechaSeleccionada != null && fechaSeleccionada != 'Todos') {
+    if (fechaSeleccionada != 'Todos') {
       final now = DateTime.now();
       DateTime desde;
       if (fechaSeleccionada == 'hoy') {
@@ -56,7 +57,7 @@ class _RequestListScreenState extends State<RequestListScreen> {
       } else {
         desde = DateTime(now.year, now.month, 1);
       }
-      query.gte('fecha_creacion', desde.toIso8601String());
+      query = query.gte('fecha_creacion', desde.toIso8601String());
     }
 
     final response = await query.order('fecha_creacion', ascending: false);
@@ -127,23 +128,23 @@ class _RequestListScreenState extends State<RequestListScreen> {
                 style: const TextStyle(color: Colors.white70),
               ),
               const SizedBox(height: 12),
-              if (solicitud['archivo_url'] != null && solicitud['archivo_url'].toString().isNotEmpty)
+              if (solicitud['archivo_url'] != null &&
+                  solicitud['archivo_url'].toString().isNotEmpty)
                 TextButton.icon(
                   onPressed: () async {
-                    final Uri url = Uri.parse(solicitud['archivo_url']);
-                    if (await canLaunchUrl(url)) {
-                      await launchUrl(url, mode: LaunchMode.externalApplication);
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('No se pudo abrir el archivo'),
-                        ),
-                      );
-                    }
+                    final url = solicitud['archivo_url'] as String;
+
+                    // ✅ Abre visor interno (WebView) en Android
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => VisorArchivoScreen(url: url),
+                      ),
+                    );
                   },
                   icon: const Icon(Icons.download, color: Colors.orange),
                   label: const Text(
-                    'Descargar archivo',
+                    'Abrir archivo adjunto',
                     style: TextStyle(
                       color: Colors.orange,
                       decoration: TextDecoration.underline,
@@ -165,7 +166,6 @@ class _RequestListScreenState extends State<RequestListScreen> {
       ),
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -239,8 +239,10 @@ class _RequestListScreenState extends State<RequestListScreen> {
                     DropdownMenuItem(value: 'resuelto', child: Text('Resuelto')),
                   ],
                   onChanged: (value) {
-                    setState(() => estadoSeleccionado = value);
-                    cargarSolicitudes();
+                    if (value != null) {
+                      setState(() => estadoSeleccionado = value);
+                      cargarSolicitudes();
+                    }
                   },
                 ),
               ),
@@ -264,8 +266,10 @@ class _RequestListScreenState extends State<RequestListScreen> {
                     DropdownMenuItem(value: 'Baja', child: Text('Baja')),
                   ],
                   onChanged: (value) {
-                    setState(() => prioridadSeleccionada = value);
-                    cargarSolicitudes();
+                    if (value != null) {
+                      setState(() => prioridadSeleccionada = value);
+                      cargarSolicitudes();
+                    }
                   },
                 ),
               ),
@@ -285,12 +289,15 @@ class _RequestListScreenState extends State<RequestListScreen> {
                   items: const [
                     DropdownMenuItem(value: 'Todos', child: Text('Todos')),
                     DropdownMenuItem(value: 'hoy', child: Text('Hoy')),
-                    DropdownMenuItem(value: 'últimos 7 días', child: Text('Últimos 7 días')),
+                    DropdownMenuItem(
+                        value: 'últimos 7 días', child: Text('Últimos 7 días')),
                     DropdownMenuItem(value: 'este mes', child: Text('Este mes')),
                   ],
                   onChanged: (value) {
-                    setState(() => fechaSeleccionada = value);
-                    cargarSolicitudes();
+                    if (value != null) {
+                      setState(() => fechaSeleccionada = value);
+                      cargarSolicitudes();
+                    }
                   },
                 ),
               ),
@@ -377,6 +384,40 @@ class _RequestListScreenState extends State<RequestListScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// ✅ Pantalla visor WebView interna
+class VisorArchivoScreen extends StatefulWidget {
+  final String url;
+
+  const VisorArchivoScreen({super.key, required this.url});
+
+  @override
+  State<VisorArchivoScreen> createState() => _VisorArchivoScreenState();
+}
+
+class _VisorArchivoScreenState extends State<VisorArchivoScreen> {
+  late final WebViewController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..loadRequest(Uri.parse(widget.url));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Ver archivo'),
+        backgroundColor: Colors.orange,
+      ),
+      body: WebViewWidget(controller: _controller),
     );
   }
 }

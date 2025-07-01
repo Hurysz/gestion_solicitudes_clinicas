@@ -8,24 +8,52 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  supabase_flutter: ^1.10.5
-  file_picker: ^6.1.1
-  provider: ^6.1.2
-  cupertino_icons: ^1.0.6
-  path: ^1.9.0
-  mime: ^1.0.4
-  intl: ^0.19.0           # 📅 Para formatear fechas elegantes
-  url_launcher: ^6.2.5   # 🔗 Para abrir enlaces de archivos adjuntos
-  path_provider: ^2.0.15
-  open_file: ^3.3.2
-  pdf: ^3.10.4
-  share_plus: ^7.2.1
 
+  # 📂 Selector de archivos (ACTUALIZADO)
+  file_picker: ^10.2.0
+
+  # 🔑 Backend y autenticación (ACTUALIZADO)
+  supabase_flutter: ^2.9.1
+
+  # 🗂️ Estados globales
+  provider: ^6.1.2
+
+  # 📌 Íconos iOS
+  cupertino_icons: ^1.0.6
+
+  # 📁 Rutas y mime types
+  path: ^1.9.0
+  mime: ^2.0.0
+
+  # 📅 Fechas
+  intl: ^0.20.2
+
+  # 🔗 URL launcher
+  url_launcher: ^6.2.5
+
+  # 📍 Paths y carpetas
+  path_provider: ^2.1.2
+
+  # 📄 Generar PDF
+  pdf: ^3.10.4
+
+  # 📤 Compartir archivos (ACTUALIZADO)
+  share_plus: ^11.0.0
+
+  # ✅ Stream bindings Supabase
+  rxdart: ^0.28.0
+
+  # 🌐 Webview
+  webview_flutter: ^4.0.7
+  webview_flutter_wkwebview: ^3.0.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
   flutter_lints: ^3.0.1
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/gato.png

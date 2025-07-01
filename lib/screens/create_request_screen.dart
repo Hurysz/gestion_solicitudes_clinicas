@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:file_picker/file_picker.dart'; // ✅ FIX PlatformFile & FilePicker
 import 'package:path/path.dart' as path;
+
 import '../services/supabase_service.dart';
 import 'login_screen.dart';
-
 class CreateRequestScreen extends StatefulWidget {
   final String ruc;
   final String nombre;

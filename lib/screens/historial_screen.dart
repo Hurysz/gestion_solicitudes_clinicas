@@ -4,8 +4,9 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:open_file/open_file.dart';
-import 'package:share_plus/share_plus.dart'; // 👈 Asegúrate de agregar en pubspec.yaml
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import '../services/supabase_service.dart';
 import 'login_screen.dart';
 
@@ -79,8 +80,7 @@ class _HistorialScreenState extends State<HistorialScreen> {
               const SizedBox(height: 8),
               const Text(
                 'Descripción:',
-                style:
-                    TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               ),
               Text(
                 solicitud['descripcion'] ?? '',
@@ -89,8 +89,7 @@ class _HistorialScreenState extends State<HistorialScreen> {
               const SizedBox(height: 8),
               const Text(
                 'Comentario del Administrador:',
-                style:
-                    TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               ),
               Text(
                 solicitud['comentario'] ?? 'Sin comentario',
@@ -112,11 +111,21 @@ class _HistorialScreenState extends State<HistorialScreen> {
     );
   }
 
+  /// ✅ Función para abrir archivo local
+  Future<void> abrirArchivoLocal(String path) async {
+    final uri = Uri.file(path);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      throw Exception('No se pudo abrir el archivo');
+    }
+  }
+
+  /// ✅ Exportar PDF y mostrar mensaje con botón Abrir
   Future<void> exportarPDF() async {
     if (historial.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('No hay solicitudes resueltas para exportar.')),
+        const SnackBar(content: Text('No hay solicitudes resueltas para exportar.')),
       );
       return;
     }
@@ -131,14 +140,12 @@ class _HistorialScreenState extends State<HistorialScreen> {
             children: [
               pw.Text(
                 'Historial de Solicitudes Resueltas',
-                style: pw.TextStyle(
-                    fontSize: 20, fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
               ),
               pw.SizedBox(height: 20),
               pw.Table.fromTextArray(
                 border: pw.TableBorder.all(color: PdfColors.grey),
-                headerStyle: pw.TextStyle(
-                    fontWeight: pw.FontWeight.bold, fontSize: 12),
+                headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12),
                 headers: ['ID', 'Fecha', 'Descripción', 'Estado'],
                 data: historial.map((s) {
                   return [
@@ -155,20 +162,34 @@ class _HistorialScreenState extends State<HistorialScreen> {
       ),
     );
 
-    final directory = await getExternalStorageDirectory();
-    final path = '${directory!.path}/Historial_Clinica_${DateTime.now().millisecondsSinceEpoch}.pdf';
+    // ✅ Guarda en Documents en lugar de ExternalStorageDirectory
+    final directory = await getApplicationDocumentsDirectory();
+    final path = '${directory.path}/Historial_Clinica_${DateTime.now().millisecondsSinceEpoch}.pdf';
     final file = File(path);
     await file.writeAsBytes(await pdf.save());
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('PDF guardado en: $path')),
+    // ✅ Muestra ventana con botón Abrir
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('PDF Exportado', style: TextStyle(color: Colors.orange)),
+        content: Text('El PDF se guardó en:\n$path'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              abrirArchivoLocal(file.path);
+              Navigator.pop(context);
+            },
+            child: const Text('Abrir'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cerrar'),
+          ),
+        ],
+      ),
     );
-
-    // Abre el archivo
-    await OpenFile.open(file.path);
-
-    // Y opcional: compartir
-    Share.shareXFiles([XFile(file.path)], text: 'Historial de Solicitudes PDF');
   }
 
   @override
@@ -179,15 +200,13 @@ class _HistorialScreenState extends State<HistorialScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // HEADER
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const CircleAvatar(
                 backgroundColor: Colors.orange,
                 radius: 20,
-                child: Icon(Icons.local_hospital,
-                    color: Colors.white, size: 20),
+                child: Icon(Icons.local_hospital, color: Colors.white, size: 20),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -196,15 +215,11 @@ class _HistorialScreenState extends State<HistorialScreen> {
                   children: [
                     const Text(
                       'Portal Clínica',
-                      style: TextStyle(
-                          color: Colors.orange,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold),
+                      style: TextStyle(color: Colors.orange, fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                     Text(
                       widget.nombre,
-                      style: const TextStyle(
-                          color: Colors.white70, fontSize: 14),
+                      style: const TextStyle(color: Colors.white70, fontSize: 14),
                     ),
                   ],
                 ),
@@ -216,16 +231,12 @@ class _HistorialScreenState extends State<HistorialScreen> {
             ],
           ),
           const SizedBox(height: 30),
-          // TITLE + EXPORT BUTTON
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
                 'HISTORIAL DE SOLICITUDES',
-                style: TextStyle(
-                    color: Colors.orange,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold),
+                style: TextStyle(color: Colors.orange, fontSize: 18, fontWeight: FontWeight.bold),
               ),
               ElevatedButton(
                 onPressed: exportarPDF,
@@ -243,32 +254,16 @@ class _HistorialScreenState extends State<HistorialScreen> {
             color: Colors.white10,
             child: Row(
               children: const [
-                Expanded(
-                    flex: 2,
-                    child: Text(
-                      'ID',
-                      style: TextStyle(color: Colors.white70),
-                    )),
-                Expanded(
-                    flex: 3,
-                    child: Text(
-                      'Fecha',
-                      style: TextStyle(color: Colors.white70),
-                    )),
-                Expanded(
-                    flex: 3,
-                    child: Text(
-                      'Estado',
-                      style: TextStyle(color: Colors.white70),
-                    )),
+                Expanded(flex: 2, child: Text('ID', style: TextStyle(color: Colors.white70))),
+                Expanded(flex: 3, child: Text('Fecha', style: TextStyle(color: Colors.white70))),
+                Expanded(flex: 3, child: Text('Estado', style: TextStyle(color: Colors.white70))),
               ],
             ),
           ),
           const SizedBox(height: 10),
           Expanded(
             child: cargando
-                ? const Center(
-                    child: CircularProgressIndicator(color: Colors.orange))
+                ? const Center(child: CircularProgressIndicator(color: Colors.orange))
                 : historial.isEmpty
                     ? const Center(
                         child: Text(
@@ -283,34 +278,28 @@ class _HistorialScreenState extends State<HistorialScreen> {
                           return InkWell(
                             onTap: () => mostrarDetalle(solicitud),
                             child: Container(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 10),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
                               child: Row(
                                 children: [
                                   Expanded(
                                     flex: 2,
                                     child: Text(
                                       '#${solicitud['id']}',
-                                      style: const TextStyle(
-                                          color: Colors.white),
+                                      style: const TextStyle(color: Colors.white),
                                     ),
                                   ),
                                   Expanded(
                                     flex: 3,
                                     child: Text(
-                                      formatFecha(
-                                          solicitud['fecha_creacion']),
-                                      style: const TextStyle(
-                                          color: Colors.white70),
+                                      formatFecha(solicitud['fecha_creacion']),
+                                      style: const TextStyle(color: Colors.white70),
                                     ),
                                   ),
                                   const Expanded(
                                     flex: 3,
                                     child: Text(
                                       'resuelto',
-                                      style: TextStyle(
-                                          color: Colors.green,
-                                          fontWeight: FontWeight.bold),
+                                      style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
                                     ),
                                   ),
                                 ],

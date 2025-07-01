@@ -10,51 +10,51 @@ class SupabaseService {
 
   static SupabaseClient get client => Supabase.instance.client;
 
-  // Insertar solicitud
+  /// Insertar solicitud
   static Future<void> enviarSolicitud({
     required String ruc,
     required String descripcion,
     required String prioridad,
   }) async {
-    final response = await client.from('solicitudes').insert({
-      'ruc_clinica': ruc,
-      'descripcion': descripcion,
-      'prioridad': prioridad,
-      'estado': 'pendiente',
-      'fecha_creacion': DateTime.now().toUtc(),
-    });
-
-    if (response.error != null) {
-      throw Exception('Error al enviar solicitud: ${response.error!.message}');
+    try {
+      await client.from('solicitudes').insert({
+        'ruc_clinica': ruc,
+        'descripcion': descripcion,
+        'prioridad': prioridad,
+        'estado': 'pendiente',
+        'fecha_creacion': DateTime.now().toUtc().toIso8601String(),
+      });
+    } catch (e) {
+      throw Exception('Error al enviar solicitud: $e');
     }
   }
 
-  // Obtener solicitudes por RUC
+  /// Obtener solicitudes por RUC
   static Future<List<Map<String, dynamic>>> obtenerSolicitudesPorRuc(String ruc) async {
-    final response = await client
-        .from('solicitudes')
-        .select()
-        .eq('ruc_clinica', ruc)
-        .order('fecha_creacion', ascending: false);
+    try {
+      final List response = await client
+          .from('solicitudes')
+          .select()
+          .eq('ruc_clinica', ruc)
+          .order('fecha_creacion', ascending: false);
 
-    if (response.error != null) {
-      throw Exception('Error al obtener solicitudes: ${response.error!.message}');
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      throw Exception('Error al obtener solicitudes: $e');
     }
-
-    return List<Map<String, dynamic>>.from(response.data);
   }
 
-  // ✅ Escuchar cambios usando RealtimeChannel (versión flutter)
-  static RealtimeChannel suscribirseSolicitudes(void Function(Map<String, dynamic>) onChange) {
+  /// Suscribirse a cambios
+  static RealtimeChannel suscribirseSolicitudes(
+      void Function(Map<String, dynamic>) onChange) {
     final channel = client.channel('public:solicitudes');
 
-    channel.on(
-      RealtimeListenTypes.postgresChanges,
-      ChannelFilter(event: '*', schema: 'public', table: 'solicitudes'),
-      (payload, [ref]) {
-        if (payload is Map<String, dynamic>) {
-          onChange(payload);
-        }
+    channel.onPostgresChanges(
+      event: PostgresChangeEvent.all,
+      schema: 'public',
+      table: 'solicitudes',
+      callback: (payload) {
+        onChange(payload.newRecord);
       },
     );
 
@@ -62,18 +62,19 @@ class SupabaseService {
     return channel;
   }
 
-  // Actualizar estado
+
+  /// Actualizar estado
   static Future<void> actualizarEstado({
     required int id,
     required String nuevoEstado,
   }) async {
-    final response = await client
-        .from('solicitudes')
-        .update({'estado': nuevoEstado})
-        .eq('id', id);
-
-    if (response.error != null) {
-      throw Exception('Error al actualizar estado: ${response.error!.message}');
+    try {
+      await client
+          .from('solicitudes')
+          .update({'estado': nuevoEstado})
+          .eq('id', id);
+    } catch (e) {
+      throw Exception('Error al actualizar estado: $e');
     }
   }
 }
