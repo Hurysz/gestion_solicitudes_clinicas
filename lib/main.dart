@@ -18,7 +18,7 @@ class MyApp extends StatelessWidget {
       title: 'Gestión de Solicitudes Clínicas',
       theme: ThemeData.dark(),
       debugShowCheckedModeBanner: false,
-      home: const LoginScreen(), // ← login limpio, sin datos predefinidos
+      home: const LoginScreen(),
     );
   }
 }

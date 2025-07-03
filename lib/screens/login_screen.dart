@@ -1,5 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:glassmorphism/glassmorphism.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../services/supabase_service.dart';
 import 'main_tab_screen.dart';
 import 'admin_panel_screen.dart';
@@ -20,6 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
   String nombreClinica = '';
   bool esAdmin = false;
   bool _obscurePassword = true;
+  bool mantenerSesion = false;
   Timer? debounceTimer;
 
   final String rucAdmin = '12345678901';
@@ -27,6 +32,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    _cargarDatosGuardados();
 
     if (widget.rucInicial != null) {
       rucController.text = widget.rucInicial!;
@@ -42,6 +48,31 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       });
     });
+  }
+
+  Future<void> _cargarDatosGuardados() async {
+    final prefs = await SharedPreferences.getInstance();
+    final rucGuardado = prefs.getString('ruc_guardado');
+    final mantenerGuardado = prefs.getBool('mantener_sesion') ?? false;
+    
+    if (mantenerGuardado && rucGuardado != null && rucGuardado.isNotEmpty) {
+      setState(() {
+        rucController.text = rucGuardado;
+        mantenerSesion = true;
+      });
+      consultarNombre(rucGuardado);
+    }
+  }
+
+  Future<void> _guardarDatos(String ruc) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mantenerSesion) {
+      await prefs.setString('ruc_guardado', ruc);
+      await prefs.setBool('mantener_sesion', true);
+    } else {
+      await prefs.remove('ruc_guardado');
+      await prefs.setBool('mantener_sesion', false);
+    }
   }
 
   void debounce(VoidCallback callback, {Duration duration = const Duration(milliseconds: 500)}) {
@@ -93,7 +124,6 @@ class _LoginScreenState extends State<LoginScreen> {
       final nombre = response['nombre'];
       final passwordCorrecta = response['password'] == pass;
 
-      // Reglas para login ADMIN
       if (esAdmin) {
         if (ruc != rucAdmin) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -109,6 +139,7 @@ class _LoginScreenState extends State<LoginScreen> {
           return;
         }
 
+        await _guardarDatos(ruc);
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const AdminPanelScreen()),
@@ -116,7 +147,6 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      // Reglas para login CLÍNICA
       if (ruc == rucAdmin) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Este RUC pertenece al administrador TI')),
@@ -131,6 +161,7 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
+      await _guardarDatos(ruc);
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -162,110 +193,196 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final Color fondo = esAdmin ? const Color(0xFF111922) : const Color(0xFF1E2A38);
-    final String titulo = esAdmin ? 'MODO ADMINISTRADOR' : 'INICIO DE SESIÓN';
-    final Icon icono = esAdmin
-        ? const Icon(Icons.admin_panel_settings, color: Colors.orange, size: 70)
-        : const Icon(Icons.handshake, color: Colors.orange, size: 70);
+    final fondo1 = const Color(0xFF2e1b40);
+    final fondo2 = esAdmin ? const Color(0xFF1f1a2c) : const Color(0xFF193b3f);
+    final botonColor = const Color(0xFFEE763D);
+    final textoColor = Colors.white;
+
+    final icono = esAdmin ? 'assets/adminlogo.png' : 'assets/handhello.png';
+    final titulo = esAdmin ? 'PORTAL ADMINISTRADOR' : 'PORTAL CLÍNICA';
 
     return Scaffold(
-      backgroundColor: fondo,
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 40.0),
-        child: Center(
-          child: SingleChildScrollView(
-            child: Column(
-              children: [
-                icono,
-                const SizedBox(height: 30),
-                Text(
-                  titulo,
-                  style: const TextStyle(
-                    color: Colors.orange,
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 30),
-                TextField(
-                  controller: rucController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: 'RUC',
-                    labelStyle: TextStyle(color: Colors.white),
-                    filled: true,
-                    fillColor: Colors.white10,
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: passwordController,
-                  obscureText: _obscurePassword,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: 'Contraseña',
-                    labelStyle: const TextStyle(color: Colors.white),
-                    filled: true,
-                    fillColor: Colors.white10,
-                    border: const OutlineInputBorder(),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                        color: Colors.orange,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _obscurePassword = !_obscurePassword;
-                        });
-                      },
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Icon(
-                      esAdmin ? Icons.admin_panel_settings : Icons.local_hospital,
-                      color: Colors.orange,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        rucController.text.trim().isEmpty
-                            ? ''
-                            : nombreClinica.isNotEmpty
-                                ? '${esAdmin ? "Cuenta:" : "Clínica:"} $nombreClinica'
-                                : '${esAdmin ? "Cuenta" : "Clínica"} no encontrada',
-                        style: const TextStyle(color: Colors.white70),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 30),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    minimumSize: const Size(double.infinity, 50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  onPressed: login,
-                  child: const Text(
-                    'INGRESAR',
-                    style: TextStyle(color: Colors.white, fontSize: 18),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextButton(
-                  onPressed: toggleAdmin,
-                  child: Text(
-                    esAdmin ? '← Volver a modo clínica' : '¿Eres administrador?',
-                    style: const TextStyle(color: Colors.orange, fontSize: 14),
-                  ),
-                ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [fondo1, fondo2],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 30),
+        child: SingleChildScrollView(
+          child: GlassmorphicContainer(
+            width: double.infinity,
+            height: 600,
+            borderRadius: 25,
+            blur: 20,
+            alignment: Alignment.center,
+            border: 1,
+            linearGradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white.withOpacity(0.1),
+                Colors.white.withOpacity(0.05),
               ],
+            ),
+            borderGradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white.withOpacity(0.2),
+                Colors.white.withOpacity(0.05),
+              ],
+            ),
+            padding: const EdgeInsets.all(30),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Image.asset(icono, height: 90),
+                  const SizedBox(height: 20),
+                  Text(
+                    titulo,
+                    style: GoogleFonts.poppins(
+                      color: textoColor,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 30),
+                  SizedBox(
+                    width: 300,
+                    child: Center(
+                      child: TextField(
+                        controller: rucController,
+                        style: TextStyle(color: textoColor),
+                        decoration: InputDecoration(
+                          labelText: 'RUC',
+                          labelStyle: TextStyle(color: textoColor),
+                          filled: true,
+                          fillColor: Colors.white12,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: 300,
+                    child: Center(
+                      child: TextField(
+                        controller: passwordController,
+                        obscureText: _obscurePassword,
+                        style: TextStyle(color: textoColor),
+                        decoration: InputDecoration(
+                          labelText: 'Contraseña',
+                          labelStyle: TextStyle(color: textoColor),
+                          filled: true,
+                          fillColor: Colors.white12,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                              color: botonColor,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _obscurePassword = !_obscurePassword;
+                              });
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  SizedBox(
+                    width: 300,
+                    child: Row(
+                      children: [
+                        Checkbox(
+                          value: mantenerSesion,
+                          onChanged: (value) {
+                            setState(() {
+                              mantenerSesion = value ?? false;
+                            });
+                          },
+                          activeColor: botonColor,
+                          checkColor: Colors.white,
+                        ),
+                        Expanded(
+                          child: Text(
+                            'Mantener la sesión iniciada',
+                            style: GoogleFonts.poppins(
+                              color: textoColor,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: 300,
+                    child: Center(
+                      child: rucController.text.isNotEmpty
+                          ? Text(
+                              nombreClinica.isNotEmpty
+                                  ? '${esAdmin ? "Cuenta:" : "Clínica:"} $nombreClinica'
+                                  : '${esAdmin ? "Cuenta" : "Clínica"} no encontrada',
+                              style: TextStyle(color: textoColor.withOpacity(0.7)),
+                              textAlign: TextAlign.center,
+                            )
+                          : const SizedBox(),
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+                  SizedBox(
+                    width: 200,
+                    height: 50,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: botonColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: login,
+                      child: Text(
+                        'INGRESAR',
+                        style: GoogleFonts.poppins(
+                          color: textoColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          letterSpacing: 1.1,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  TextButton(
+                    onPressed: toggleAdmin,
+                    child: Text(
+                      esAdmin ? 'Volver a modo clínica' : '¿Eres administrador?',
+                      style: GoogleFonts.poppins(
+                        color: botonColor,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

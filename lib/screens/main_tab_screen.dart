@@ -26,15 +26,9 @@ class _MainTabScreenState extends State<MainTabScreen> {
   void initState() {
     super.initState();
     _screens = [
-      CreateRequestScreen(
-        ruc: widget.ruc,
-        nombre: widget.nombre,
-      ),
-      RequestListScreen(
-        ruc: widget.ruc,
-        nombre: widget.nombre,
-      ),
-      HistorialScreen(nombre: widget.nombre, ruc: widget.ruc)
+      CreateRequestScreen(ruc: widget.ruc, nombre: widget.nombre),
+      RequestListScreen(ruc: widget.ruc, nombre: widget.nombre),
+      HistorialScreen(ruc: widget.ruc, nombre: widget.nombre),
     ];
   }
 
@@ -47,32 +41,81 @@ class _MainTabScreenState extends State<MainTabScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF1E2A38),
-      appBar: AppBar(
-        backgroundColor: Colors.orange,
-        title: const Text('PORTAL CLÍNICA'),
-      ),
+      // Fondo uniforme igual a tu prototipo izquierdo
+      backgroundColor: const Color(0xFF233550),
       body: _screens[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.orange,
-        selectedItemColor: Colors.white,
-        unselectedItemColor: Colors.white70,
-        currentIndex: _selectedIndex,
-        onTap: _onTabSelected,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.create),
-            label: 'Crear',
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white, // fondo blanco
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(12),
+            topRight: Radius.circular(12),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.list),
-            label: 'Solicitudes',
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 4,
+              offset: Offset(0, -1),
+            )
+          ],
+        ),
+        child: SafeArea(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildTabItem(
+                index: 0,
+                icon: Icons.create,
+                label: 'Crear',
+              ),
+              _buildTabItem(
+                index: 1,
+                icon: Icons.list,
+                label: 'Solicitudes',
+              ),
+              _buildTabItem(
+                index: 2,
+                icon: Icons.history,
+                label: 'Historial',
+              ),
+            ],
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.history),
-            label: 'Historial',
-          ),
-        ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabItem({
+    required int index,
+    required IconData icon,
+    required String label,
+  }) {
+    final bool isSelected = _selectedIndex == index;
+    return GestureDetector(
+      onTap: () => _onTabSelected(index),
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFee763d) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? Colors.white : const Color(0xFF919aa8),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : const Color(0xFF919aa8),
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

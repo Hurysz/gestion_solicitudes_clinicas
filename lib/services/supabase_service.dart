@@ -10,7 +10,7 @@ class SupabaseService {
 
   static SupabaseClient get client => Supabase.instance.client;
 
-  /// Insertar solicitud
+  //Insertar solicitud
   static Future<void> enviarSolicitud({
     required String ruc,
     required String descripcion,
@@ -29,7 +29,7 @@ class SupabaseService {
     }
   }
 
-  /// Obtener solicitudes por RUC
+  //Obtener solicitudes por RUC
   static Future<List<Map<String, dynamic>>> obtenerSolicitudesPorRuc(String ruc) async {
     try {
       final List response = await client
@@ -44,7 +44,7 @@ class SupabaseService {
     }
   }
 
-  /// Suscribirse a cambios
+  //Suscribirse a cambios
   static RealtimeChannel suscribirseSolicitudes(
       void Function(Map<String, dynamic>) onChange) {
     final channel = client.channel('public:solicitudes');
@@ -63,7 +63,7 @@ class SupabaseService {
   }
 
 
-  /// Actualizar estado
+  //Actualizar estado
   static Future<void> actualizarEstado({
     required int id,
     required String nuevoEstado,

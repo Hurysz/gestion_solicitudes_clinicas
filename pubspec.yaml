@@ -9,43 +9,52 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # 📂 Selector de archivos (ACTUALIZADO)
+  # Selector de archivos
   file_picker: ^10.2.0
 
-  # 🔑 Backend y autenticación (ACTUALIZADO)
+  # Backend y autenticación
   supabase_flutter: ^2.9.1
 
-  # 🗂️ Estados globales
+  # Estados globales
   provider: ^6.1.2
 
-  # 📌 Íconos iOS
+  # Íconos iOS
   cupertino_icons: ^1.0.6
 
-  # 📁 Rutas y mime types
+  # Rutas y mime types
   path: ^1.9.0
   mime: ^2.0.0
 
-  # 📅 Fechas
+  # Fechas
   intl: ^0.20.2
 
-  # 🔗 URL launcher
+  # URL launcher
   url_launcher: ^6.2.5
 
-  # 📍 Paths y carpetas
+  # Paths y carpetas
   path_provider: ^2.1.2
 
-  # 📄 Generar PDF
+  # Generar PDF
   pdf: ^3.10.4
 
-  # 📤 Compartir archivos (ACTUALIZADO)
+  # Compartir archivos
   share_plus: ^11.0.0
 
-  # ✅ Stream bindings Supabase
+  # Stream bindings Supabase
   rxdart: ^0.28.0
 
-  # 🌐 Webview
+  # WebView
   webview_flutter: ^4.0.7
   webview_flutter_wkwebview: ^3.0.0
+
+  # Efectos de cristal
+  glassmorphism: ^2.0.0
+
+  # Tipografías de Google
+  google_fonts: ^6.1.0
+
+  # Almacenamiento local simple
+  shared_preferences: ^2.2.2
 
 dev_dependencies:
   flutter_test:
@@ -53,7 +62,24 @@ dev_dependencies:
 
   flutter_lints: ^3.0.1
 
+  # Generador de iconos
+  flutter_launcher_icons: ^0.14.4
+
+# Configuración de flutter_launcher_icons
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/icono_app.png"
+
 flutter:
   uses-material-design: true
+
   assets:
     - assets/gato.png
+    - assets/handhello.png
+    - assets/adminlogo.png
+    - assets/empresa.png
+    - assets/logout.png
+    - assets/upload.png
+    - assets/admin1.png
+    - assets/icono_app.png

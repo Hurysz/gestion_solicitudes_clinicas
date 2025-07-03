@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import '../services/supabase_service.dart';
 import 'login_screen.dart';
-import 'package:webview_flutter/webview_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'order_detail_overlay.dart';
 
 class RequestListScreen extends StatefulWidget {
   final String ruc;
@@ -20,39 +20,33 @@ class RequestListScreen extends StatefulWidget {
 }
 
 class _RequestListScreenState extends State<RequestListScreen> {
-  String estadoSeleccionado = 'Todos';
-  String prioridadSeleccionada = 'Todos';
-  String fechaSeleccionada = 'Todos';
-
+  String estado = 'Todos';
+  String prioridad = 'Todos';
+  String fecha = 'Todos';
   List<dynamic> solicitudes = [];
   bool cargando = true;
 
   @override
   void initState() {
     super.initState();
-    cargarSolicitudes();
+    _cargarSolicitudes();
   }
 
-  Future<void> cargarSolicitudes() async {
+  Future<void> _cargarSolicitudes() async {
     setState(() => cargando = true);
-
     var query = SupabaseService.client
         .from('solicitudes')
         .select()
         .eq('ruc_clinica', widget.ruc);
 
-    if (estadoSeleccionado != 'Todos') {
-      query = query.eq('estado', estadoSeleccionado);
-    }
-    if (prioridadSeleccionada != 'Todos') {
-      query = query.eq('prioridad', prioridadSeleccionada);
-    }
-    if (fechaSeleccionada != 'Todos') {
+    if (estado != 'Todos') query = query.eq('estado', estado);
+    if (prioridad != 'Todos') query = query.eq('prioridad', prioridad);
+    if (fecha != 'Todos') {
       final now = DateTime.now();
       DateTime desde;
-      if (fechaSeleccionada == 'hoy') {
+      if (fecha == 'Hoy') {
         desde = DateTime(now.year, now.month, now.day);
-      } else if (fechaSeleccionada == 'últimos 7 días') {
+      } else if (fecha == 'Últimos 7 días') {
         desde = now.subtract(const Duration(days: 7));
       } else {
         desde = DateTime(now.year, now.month, 1);
@@ -61,108 +55,63 @@ class _RequestListScreenState extends State<RequestListScreen> {
     }
 
     final response = await query.order('fecha_creacion', ascending: false);
-
     setState(() {
       solicitudes = response;
       cargando = false;
     });
   }
 
-  void reiniciarFiltros() {
+  void _resetFiltros() {
     setState(() {
-      estadoSeleccionado = 'Todos';
-      prioridadSeleccionada = 'Todos';
-      fechaSeleccionada = 'Todos';
+      estado = 'Todos';
+      prioridad = 'Todos';
+      fecha = 'Todos';
     });
-    cargarSolicitudes();
+    _cargarSolicitudes();
   }
 
-  String formatFecha(String fechaISO) {
-    final date = DateTime.parse(fechaISO);
-    return DateFormat('dd/MM/yyyy HH:mm').format(date);
+  String _formatFecha(String iso) {
+    return DateFormat('dd/MM/yyyy HH:mm').format(DateTime.parse(iso));
   }
 
-  void logout() {
+  void _logout() {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (_) => const LoginScreen()),
     );
   }
 
-  void mostrarDetalle(Map<String, dynamic> solicitud) {
-    showDialog(
+  Future<void> _selectFiltro(
+    String title,
+    List<String> opciones,
+    String seleccionado,
+    void Function(String) onSelect,
+  ) {
+    return showModalBottomSheet(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF1E2A38),
-        title: Text(
-          'Solicitud #${solicitud['id']}',
-          style: const TextStyle(color: Colors.orange),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Fecha: ${formatFecha(solicitud['fecha_creacion'])}',
-                style: const TextStyle(color: Colors.white70),
+      backgroundColor: const Color(0xFF233550),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+      ),
+      builder: (_) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: opciones.map((opt) {
+          final isSel = opt == seleccionado;
+          return ListTile(
+            title: Text(
+              opt,
+              style: TextStyle(
+                color: isSel ? const Color(0xFFee763d) : Colors.white,
+                fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Descripción:',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                solicitud['descripcion'] ?? '',
-                style: const TextStyle(color: Colors.white70),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Estado: ${solicitud['estado']}',
-                style: const TextStyle(color: Colors.white70),
-              ),
-              Text(
-                'Prioridad: ${solicitud['prioridad']}',
-                style: const TextStyle(color: Colors.white70),
-              ),
-              const SizedBox(height: 12),
-              if (solicitud['archivo_url'] != null &&
-                  solicitud['archivo_url'].toString().isNotEmpty)
-                TextButton.icon(
-                  onPressed: () async {
-                    final url = solicitud['archivo_url'] as String;
-
-                    // ✅ Abre visor interno (WebView) en Android
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => VisorArchivoScreen(url: url),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.download, color: Colors.orange),
-                  label: const Text(
-                    'Abrir archivo adjunto',
-                    style: TextStyle(
-                      color: Colors.orange,
-                      decoration: TextDecoration.underline,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Cerrar',
-              style: TextStyle(color: Colors.orange),
             ),
-          ),
-        ],
+            onTap: () {
+              onSelect(opt);
+              Navigator.pop(context);
+              _cargarSolicitudes();
+            },
+          );
+        }).toList(),
       ),
     );
   }
@@ -170,242 +119,259 @@ class _RequestListScreenState extends State<RequestListScreen> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: const Color(0xFF1E2A38),
-      padding: const EdgeInsets.all(20.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const CircleAvatar(
-                backgroundColor: Colors.orange,
-                radius: 20,
-                child: Icon(Icons.local_hospital, color: Colors.white, size: 20),
+      color: const Color(0xFF233550),
+      child: SafeArea(
+        child: Column(
+          children: [
+            // HEADER
+            Container(
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2E3B53),
+                borderRadius: BorderRadius.circular(8),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Portal Clínica',
-                      style: TextStyle(
-                          color: Colors.orange,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      widget.nombre,
-                      style: const TextStyle(
-                          color: Colors.white70, fontSize: 14),
-                    ),
-                  ],
-                ),
-              ),
-              IconButton(
-                onPressed: logout,
-                icon: const Icon(Icons.logout, color: Colors.orange),
-              ),
-            ],
-          ),
-          const SizedBox(height: 30),
-          const Text(
-            'MIS SOLICITUDES',
-            style: TextStyle(
-              color: Colors.orange,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: estadoSeleccionado,
-                  dropdownColor: Colors.black87,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: 'Estado',
-                    labelStyle: TextStyle(color: Colors.white),
-                    filled: true,
-                    fillColor: Colors.white10,
-                    border: OutlineInputBorder(),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'Todos', child: Text('Todos')),
-                    DropdownMenuItem(value: 'pendiente', child: Text('Pendiente')),
-                    DropdownMenuItem(value: 'en proceso', child: Text('En proceso')),
-                    DropdownMenuItem(value: 'resuelto', child: Text('Resuelto')),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() => estadoSeleccionado = value);
-                      cargarSolicitudes();
-                    }
-                  },
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: prioridadSeleccionada,
-                  dropdownColor: Colors.black87,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: 'Prioridad',
-                    labelStyle: TextStyle(color: Colors.white),
-                    filled: true,
-                    fillColor: Colors.white10,
-                    border: OutlineInputBorder(),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'Todos', child: Text('Todos')),
-                    DropdownMenuItem(value: 'Alta', child: Text('Alta')),
-                    DropdownMenuItem(value: 'Media', child: Text('Media')),
-                    DropdownMenuItem(value: 'Baja', child: Text('Baja')),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() => prioridadSeleccionada = value);
-                      cargarSolicitudes();
-                    }
-                  },
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: fechaSeleccionada,
-                  dropdownColor: Colors.black87,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: 'Fecha',
-                    labelStyle: TextStyle(color: Colors.white),
-                    filled: true,
-                    fillColor: Colors.white10,
-                    border: OutlineInputBorder(),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'Todos', child: Text('Todos')),
-                    DropdownMenuItem(value: 'hoy', child: Text('Hoy')),
-                    DropdownMenuItem(
-                        value: 'últimos 7 días', child: Text('Últimos 7 días')),
-                    DropdownMenuItem(value: 'este mes', child: Text('Este mes')),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() => fechaSeleccionada = value);
-                      cargarSolicitudes();
-                    }
-                  },
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: reiniciarFiltros,
-              icon: const Icon(Icons.refresh, color: Colors.orange),
-              label: const Text(
-                'Reiniciar filtros',
-                style: TextStyle(color: Colors.orange),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Expanded(
-            child: cargando
-                ? const Center(child: CircularProgressIndicator(color: Colors.orange))
-                : solicitudes.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'No hay solicitudes aún',
-                          style: TextStyle(color: Colors.white70),
+              child: Row(
+                children: [
+                  Image.asset('assets/empresa.png', width: 32, height: 32),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Portal Clínica',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      )
-                    : ListView.builder(
-                        itemCount: solicitudes.length,
-                        itemBuilder: (context, index) {
-                          final solicitud = solicitudes[index];
-                          return Card(
-                            color: Colors.white10,
-                            margin: const EdgeInsets.only(bottom: 12.0),
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.all(16),
-                              title: Text(
-                                '#${solicitud['id']}',
-                                style: const TextStyle(
-                                    color: Colors.orange,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16),
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Fecha: ${formatFecha(solicitud['fecha_creacion'])}',
-                                    style: const TextStyle(
-                                        color: Colors.white70, fontSize: 12),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    solicitud['descripcion'] ?? '',
-                                    style: const TextStyle(
-                                        color: Colors.white, fontSize: 14),
-                                  ),
-                                ],
-                              ),
-                              trailing: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    solicitud['estado'],
-                                    style: const TextStyle(
-                                        color: Colors.orange,
-                                        fontWeight: FontWeight.bold),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Prioridad: ${solicitud['prioridad']}',
-                                    style: const TextStyle(
-                                        color: Colors.white70, fontSize: 12),
-                                  ),
-                                ],
-                              ),
-                              onTap: () => mostrarDetalle(solicitud),
-                            ),
-                          );
-                        },
+                        Text(
+                          widget.nombre.toUpperCase(),
+                          style: const TextStyle(
+                            color: Color(0xFFee763d),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  InkWell(
+                    onTap: _logout,
+                    child: Image.asset('assets/logout.png', width: 24, height: 24),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            // TÍTULO
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: const Text(
+                  'MIS SOLICITUDES',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // FILTROS
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  _FilterButton(
+                    label: estado,
+                    onTap: () => _selectFiltro(
+                      'Estado',
+                      ['Todos', 'pendiente', 'en proceso', 'resuelto'],
+                      estado,
+                      (v) => setState(() => estado = v),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _FilterButton(
+                    label: prioridad,
+                    onTap: () => _selectFiltro(
+                      'Prioridad',
+                      ['Todos', 'Alta', 'Media', 'Baja'],
+                      prioridad,
+                      (v) => setState(() => prioridad = v),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _FilterButton(
+                    label: fecha,
+                    onTap: () => _selectFiltro(
+                      'Fecha',
+                      ['Todos', 'Hoy', 'Últimos 7 días', 'Este mes'],
+                      fecha,
+                      (v) => setState(() => fecha = v),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: _resetFiltros,
+                    child: const Icon(Icons.refresh, color: Color(0xFFee763d)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            // LISTADO
+            Expanded(
+              child: cargando
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation(Color(0xFFee763d)),
                       ),
+                    )
+                  : solicitudes.isEmpty
+                      ? const Center(
+                          child: Text(
+                            'No hay solicitudes aún',
+                            style: TextStyle(color: Colors.white70, fontSize: 14),
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: solicitudes.length,
+                          itemBuilder: (_, i) {
+                            final s = solicitudes[i];
+                            return GestureDetector(
+                              onTap: () {
+                                OrderDetailOverlay.show(
+                                  context,
+                                  solicitud: s,
+                                  onClose: () {},
+                                );
+                              },
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF2E3B53),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: ListTile(
+                                  contentPadding: const EdgeInsets.all(12),
+                                  title: Text(
+                                    '#${s['id']}',
+                                    style: const TextStyle(
+                                      color: Color(0xFFee763d),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    _formatFecha(s['fecha_creacion']),
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  trailing: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: _estadoColor(s['estado']),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          s['estado'].toUpperCase(),
+                                          style: const TextStyle(
+                                              color: Colors.white, fontSize: 10),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        s['prioridad'],
+                                        style: const TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _estadoColor(String estado) {
+    switch (estado) {
+      case 'pendiente':
+        return Colors.yellow.shade700;
+      case 'en proceso':
+        return Colors.blue.shade600;
+      default:
+        return Colors.green.shade600;
+    }
+  }
+}
+
+class _FilterButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  const _FilterButton({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF2E3B53),
+            borderRadius: BorderRadius.circular(6),
           ),
-        ],
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label,
+                  style: const TextStyle(color: Colors.white, fontSize: 12)),
+              const Icon(Icons.keyboard_arrow_down,
+                  size: 16, color: Colors.white),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-/// ✅ Pantalla visor WebView interna
-class VisorArchivoScreen extends StatefulWidget {
+class _VisorArchivoScreen extends StatefulWidget {
   final String url;
-
-  const VisorArchivoScreen({super.key, required this.url});
+  const _VisorArchivoScreen({required this.url, super.key});
 
   @override
-  State<VisorArchivoScreen> createState() => _VisorArchivoScreenState();
+  State<_VisorArchivoScreen> createState() => _VisorArchivoScreenState();
 }
 
-class _VisorArchivoScreenState extends State<VisorArchivoScreen> {
-  late final WebViewController _controller;
+class _VisorArchivoScreenState extends State<_VisorArchivoScreen> {
+  late final WebViewController _ctrl;
 
   @override
   void initState() {
     super.initState();
-
-    _controller = WebViewController()
+    _ctrl = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..loadRequest(Uri.parse(widget.url));
   }
@@ -413,11 +379,12 @@ class _VisorArchivoScreenState extends State<VisorArchivoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF233550),
       appBar: AppBar(
+        backgroundColor: const Color(0xFFee763d),
         title: const Text('Ver archivo'),
-        backgroundColor: Colors.orange,
       ),
-      body: WebViewWidget(controller: _controller),
+      body: WebViewWidget(controller: _ctrl),
     );
   }
 }
