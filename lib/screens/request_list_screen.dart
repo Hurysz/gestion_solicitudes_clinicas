@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'dart:ui';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../services/supabase_service.dart';
 import 'login_screen.dart';
-import 'order_detail_overlay.dart';
 
 class RequestListScreen extends StatefulWidget {
   final String ruc;
@@ -81,12 +81,7 @@ class _RequestListScreenState extends State<RequestListScreen> {
     );
   }
 
-  Future<void> _selectFiltro(
-    String title,
-    List<String> opciones,
-    String seleccionado,
-    void Function(String) onSelect,
-  ) {
+  Future<void> _selectFiltro(String title, List<String> opciones, String seleccionado, void Function(String) onSelect) {
     return showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF233550),
@@ -113,6 +108,29 @@ class _RequestListScreenState extends State<RequestListScreen> {
           );
         }).toList(),
       ),
+    );
+  }
+
+  void _showDetalle(Map<String, dynamic> solicitud) {
+    showGeneralDialog(
+      context: context,
+      barrierLabel: 'DetalleSolicitud',
+      barrierDismissible: true,
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (_, __, ___) => const SizedBox.shrink(),
+      transitionBuilder: (ctx, anim1, anim2, _) {
+        final curved = Curves.easeOut.transform(anim1.value);
+        return Opacity(
+          opacity: curved,
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 8 * curved, sigmaY: 8 * curved),
+            child: Center(
+              child: _DetailCard(solicitud: solicitud),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -186,7 +204,8 @@ class _RequestListScreenState extends State<RequestListScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
-                  _FilterButton(
+                  _FilterButtonWithLabel(
+                    title: 'Estado',
                     label: estado,
                     onTap: () => _selectFiltro(
                       'Estado',
@@ -196,7 +215,8 @@ class _RequestListScreenState extends State<RequestListScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  _FilterButton(
+                  _FilterButtonWithLabel(
+                    title: 'Prioridad',
                     label: prioridad,
                     onTap: () => _selectFiltro(
                       'Prioridad',
@@ -206,7 +226,8 @@ class _RequestListScreenState extends State<RequestListScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  _FilterButton(
+                  _FilterButtonWithLabel(
+                    title: 'Fecha',
                     label: fecha,
                     onTap: () => _selectFiltro(
                       'Fecha',
@@ -216,9 +237,13 @@ class _RequestListScreenState extends State<RequestListScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: _resetFiltros,
-                    child: const Icon(Icons.refresh, color: Color(0xFFee763d)),
+                  Container(
+                    alignment: Alignment.bottomCenter,
+                    height: 60,
+                    child: GestureDetector(
+                      onTap: _resetFiltros,
+                      child: const Icon(Icons.refresh, color: Color(0xFFee763d), size: 20),
+                    ),
                   ),
                 ],
               ),
@@ -245,13 +270,7 @@ class _RequestListScreenState extends State<RequestListScreen> {
                           itemBuilder: (_, i) {
                             final s = solicitudes[i];
                             return GestureDetector(
-                              onTap: () {
-                                OrderDetailOverlay.show(
-                                  context,
-                                  solicitud: s,
-                                  onClose: () {},
-                                );
-                              },
+                              onTap: () => _showDetalle(s),
                               child: Container(
                                 margin: const EdgeInsets.only(bottom: 12),
                                 decoration: BoxDecoration(
@@ -267,12 +286,29 @@ class _RequestListScreenState extends State<RequestListScreen> {
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  subtitle: Text(
-                                    _formatFecha(s['fecha_creacion']),
-                                    style: const TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 12,
-                                    ),
+                                  subtitle: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        s['descripcion'] != null 
+                                          ? (s['descripcion'].length > 50 
+                                              ? '${s['descripcion'].substring(0, 50)}...' 
+                                              : s['descripcion'])
+                                          : 'Sin descripción',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        _formatFecha(s['fecha_creacion']),
+                                        style: const TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                   trailing: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
@@ -357,22 +393,210 @@ class _FilterButton extends StatelessWidget {
   }
 }
 
-class _VisorArchivoScreen extends StatefulWidget {
-  final String url;
-  const _VisorArchivoScreen({required this.url, super.key});
+class _FilterButtonWithLabel extends StatelessWidget {
+  final String title;
+  final String label;
+  final VoidCallback onTap;
+  const _FilterButtonWithLabel({
+    required this.title,
+    required this.label,
+    required this.onTap,
+  });
 
   @override
-  State<_VisorArchivoScreen> createState() => _VisorArchivoScreenState();
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 4),
+          GestureDetector(
+            onTap: onTap,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2E3B53),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const Icon(Icons.keyboard_arrow_down,
+                      size: 16, color: Colors.white),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _VisorArchivoScreenState extends State<_VisorArchivoScreen> {
-  late final WebViewController _ctrl;
+class _DetailCard extends StatelessWidget {
+  final Map<String, dynamic> solicitud;
+  const _DetailCard({required this.solicitud});
+
+  String _formatFecha(String iso) {
+    return DateFormat('dd/MM/yyyy HH:mm').format(DateTime.parse(iso));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.85,
+        margin: const EdgeInsets.symmetric(horizontal: 24),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFF15212c).withOpacity(0.95),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.2)),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'SOLICITUD #${solicitud['id']}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1,
+                ),
+              ),
+              const SizedBox(height: 16),
+              _buildInfoRow('Fecha:', _formatFecha(solicitud['fecha_creacion'])),
+              const SizedBox(height: 12),
+              const Text(
+                'DESCRIPCIÓN:',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                solicitud['descripcion'] ?? '',
+                style: const TextStyle(color: Colors.white70, fontSize: 14),
+              ),
+              const SizedBox(height: 12),
+              _buildInfoRow('Estado:', solicitud['estado'].toString().toUpperCase()),
+              const SizedBox(height: 8),
+              _buildInfoRow('Prioridad:', solicitud['prioridad']),
+              const SizedBox(height: 12),
+              if (solicitud['archivo_url'] != null && solicitud['archivo_url'].toString().isNotEmpty)
+                Container(
+                  width: double.infinity,
+                  child: TextButton.icon(
+                    onPressed: () {
+                      final url = solicitud['archivo_url'] as String;
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => VisorArchivoScreen(url: url)),
+                      );
+                    },
+                    icon: const Icon(Icons.visibility, color: Color(0xFFee763d), size: 16),
+                    label: const Text(
+                      'VER ARCHIVO ADJUNTO',
+                      style: TextStyle(color: Color(0xFFee763d), fontSize: 12),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 20),
+              Align(
+                alignment: Alignment.center,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFee763d)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                  ),
+                  child: const Text('Cerrar', style: TextStyle(color: Color(0xFFee763d))),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// Nueva clase para visualizar archivos
+class VisorArchivoScreen extends StatefulWidget {
+  final String url;
+  
+  const VisorArchivoScreen({super.key, required this.url});
+
+  @override
+  State<VisorArchivoScreen> createState() => _VisorArchivoScreenState();
+}
+
+class _VisorArchivoScreenState extends State<VisorArchivoScreen> {
+  late final WebViewController _controller;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = WebViewController()
+    _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (String url) {
+            setState(() {
+              _isLoading = true;
+            });
+          },
+          onPageFinished: (String url) {
+            setState(() {
+              _isLoading = false;
+            });
+          },
+          onWebResourceError: (WebResourceError error) {
+            setState(() {
+              _isLoading = false;
+            });
+          },
+        ),
+      )
       ..loadRequest(Uri.parse(widget.url));
   }
 
@@ -381,10 +605,30 @@ class _VisorArchivoScreenState extends State<_VisorArchivoScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF233550),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFee763d),
-        title: const Text('Ver archivo'),
+        backgroundColor: const Color(0xFF233550),
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'Archivo Adjunto',
+          style: TextStyle(color: Colors.white),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.close, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
       ),
-      body: WebViewWidget(controller: _ctrl),
+      body: Stack(
+        children: [
+          WebViewWidget(controller: _controller),
+          if (_isLoading)
+            const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation(Color(0xFFee763d)),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

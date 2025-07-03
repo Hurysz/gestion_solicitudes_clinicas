@@ -32,8 +32,8 @@ dependencies:
   url_launcher: ^6.2.5
 
   # Paths y carpetas
-  path_provider: ^2.1.2
-
+  path_provider: ^2.0.15
+  open_file: ^3.3.2
   # Generar PDF
   pdf: ^3.10.4
 
